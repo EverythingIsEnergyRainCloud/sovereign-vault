@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Sovereign Vault</title>
+  <link rel="manifest" href="./manifest.json" />
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --surface-alt: #273549; --border: #334155;
+      --text: #f8fafc; --muted: #94a3b8; --accent: #38bdf8; --success: #34d399; --danger: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    header {
+      padding: 16px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; color: var(--accent); }
+    header span { font-size: 0.78rem; color: var(--muted); }
+    nav { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-bottom: 1px solid var(--border); }
+    nav button {
+      background: none; border: none; color: var(--muted); padding: 13px 8px; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;
+    }
+    nav button.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(56, 189, 248, 0.06); }
+    main { flex: 1; padding: 18px; max-width: 760px; width: 100%; margin: 0 auto; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 0.84rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    input[type="text"], input[type="password"], textarea, select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 11px 12px; font-size: 0.95rem; margin-bottom: 14px;
+    }
+    textarea { min-height: 110px; resize: vertical; line-height: 1.45; }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 0.88rem; color: var(--text); }
+    .checkbox-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .drop-zone {
+      border: 2px dashed var(--accent); border-radius: 12px; padding: 22px 16px; text-align: center;
+      background: rgba(56, 189, 248, 0.05); cursor: pointer; margin-bottom: 14px;
+    }
+    .drop-zone p { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+    .drop-zone small { color: var(--muted); font-size: 0.8rem; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; width: 100%;
+      background: var(--accent); color: #0f172a; font-weight: 700; border: none; border-radius: 8px;
+      padding: 12px 16px; font-size: 0.95rem; cursor: pointer;
+    }
+    .btn-secondary { background: var(--surface-alt); color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.3); padding: 6px 10px; font-size: 0.8rem; width: auto; }
+    .status-box {
+      background: var(--bg); border-left: 3px solid var(--accent); padding: 10px 12px;
+      border-radius: 6px; font-size: 0.86rem; color: var(--text); margin-bottom: 14px; display: none;
+    }
+    .entry-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+    .entry-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+    .badge { display: inline-block; background: rgba(56, 189, 248, 0.14); color: var(--accent); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; }
+    .entry-meta { font-size: 0.76rem; color: var(--muted); margin-top: 4px; }
+    .entry-body { font-size: 0.9rem; line-height: 1.5; color: #e2e8f0; white-space: pre-wrap; max-height: 180px; overflow-y: auto; background: var(--bg); padding: 10px; border-radius: 8px; margin-top: 8px; }
+    .row-actions { display: flex; gap: 8px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Sovereign Vault</h1>
+  <span id="vault-count">0 Entries</span>
+</header>
+
+<nav>
+  <button class="active" onclick="switchTab('capture', this)">Capture</button>
+  <button onclick="switchTab('vault', this)">Vault</button>
+  <button onclick="switchTab('sync', this)">Sync &amp; Backup</button>
+</nav>
+
+<main>
+  <!-- CAPTURE TAB -->
+  <section id="tab-capture" class="tab-panel active">
+    <div class="card">
+      <label for="album-tag">Album / Topic Tag</label>
+      <input type="text" id="album-tag" placeholder="e.g., Loveland History, Botany, Systemic Research" />
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="publish-discord" />
+        <span>Also post to Discord channel when saved</span>
+      </label>
+
+      <label>1. Batch Screenshot &amp; Photo OCR (Offline)</label>
+      <div class="drop-zone" onclick="document.getElementById('image-input').click()">
+        <p>+ Select Screenshots or Photos</p>
+        <small>Extracts text locally on your device &amp; backs up to your private HF dataset</small>
+        <input type="file" id="image-input" accept="image/*" multiple style="display:none" onchange="handleImageBatch(event)" />
+      </div>
+      <div id="ocr-status" class="status-box"></div>
+
+      <label for="manual-title">2. Save Note, Transcript, or Research Link</label>
+      <input type="text" id="manual-title" placeholder="Title or Video Name" />
+      <textarea id="manual-text" placeholder="Paste transcript text, URLs, notes, or voice reflection..."></textarea>
+      <button class="btn" onclick="saveManualNote()">Save to Sovereign Vault</button>
+    </div>
+  </section>
+
+  <!-- VAULT TAB -->
+  <section id="tab-vault" class="tab-panel">
+    <div class="card" style="padding: 12px;">
+      <button class="btn btn-secondary" onclick="syncWithHuggingFace()" style="margin-bottom: 10px;">Two-Way Sync with Private HF Dataset</button>
+      <input type="text" id="search-input" placeholder="Search extracted text, titles, or tags..." oninput="renderVault()" style="margin-bottom: 10px;" />
+      <select id="album-filter" onchange="renderVault()" style="margin-bottom: 0;">
+        <option value="">All Albums / Topics</option>
+      </select>
+    </div>
+    <div id="vault-list"></div>
+  </section>
+
+  <!-- SYNC & BACKUP TAB -->
+  <section id="tab-sync" class="tab-panel">
+    <div class="card">
+      <h3 style="font-size: 1rem; margin-bottom: 8px;">Direct Free Sync (Zero Paid Servers)</h3>
+      <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.45; margin-bottom: 14px;">
+        Connects directly from your browser to your private Hugging Face Dataset (100 GB free) and your Discord Webhook. Keys stay strictly in your device's local storage.
+      </p>
+
+      <label for="hf-repo">Private Hugging Face Dataset Repo</label>
+      <input type="text" id="hf-repo" placeholder="RainCloudEIE/sovereign-vault-data" />
+
+      <label for="hf-token">Hugging Face Write Token (hf_...)</label>
+      <input type="password" id="hf-token" placeholder="hf_xxxxxxxxxxxxxxxxxxxx" />
+
+      <label for="discord-webhook">Discord Channel Webhook URL</label>
+      <input type="password" id="discord-webhook" placeholder="https://discord.com/api/webhooks/..." />
+
+      <button class="btn" onclick="saveSyncSettings()">Save Direct Connections</button>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size: 1rem; margin-bottom: 8px;">Offline Portable Export &amp; Import</h3>
+      <button class="btn btn-secondary" onclick="exportAllMarkdown()" style="margin-bottom: 10px;">Download All Entries (.md)</button>
+      <button class="btn btn-secondary" onclick="exportAllJSON()" style="margin-bottom: 14px;">Download Raw Backup (.json)</button>
+
+      <label for="import-json">Import JSON or Transcript Backup</label>
+      <input type="file" id="import-json" accept=".json" onchange="importJSONBackup(event)" style="margin-bottom: 0;" />
+    </div>
+  </section>
+</main>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(console.error);
+  }
+
+  document.getElementById('hf-repo').value = localStorage.getItem('hf_repo') || 'RainCloudEIE/sovereign-vault-data';
+  document.getElementById('hf-token').value = localStorage.getItem('hf_token') || '';
+  document.getElementById('discord-webhook').value = localStorage.getItem('discord_webhook') || '';
+
+  function saveSyncSettings() {
+    localStorage.setItem('hf_repo', document.getElementById('hf-repo').value.trim());
+    localStorage.setItem('hf_token', document.getElementById('hf_token').value.trim());
+    localStorage.setItem('discord_webhook', document.getElementById('discord-webhook').value.trim());
+    alert('Connection settings saved locally on this device.');
+  }
+
+  let db;
+  const DB_NAME = 'SovereignVaultDB';
+  const STORE_NAME = 'entries';
+
+  const request = indexedDB.open(DB_NAME, 1);
+  request.onupgradeneeded = (e) => {
+    db = e.target.result;
+    if (!db.objectStoreNames.contains(STORE_NAME)) {
+      db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+    }
+  };
+  request.onsuccess = (e) => {
+    db = e.target.result;
+    renderVault();
+  };
+
+  function switchTab(tabName, btnEl) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tabName).classList.add('active');
+    btnEl.classList.add('active');
+    if (tabName === 'vault') renderVault();
+  }
+
+  function addLocalEntry(entry) {
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).add(entry);
+      tx.oncomplete = () => { renderVault(); resolve(); };
+    });
+  }
+
+  function getAllEntries() {
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).getAll();
+      req.onsuccess = () => resolve(req.result.reverse());
+    });
+  }
+
+  function deleteEntry(id) {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(id);
+    tx.oncomplete = () => renderVault();
+  }
+
+  async function postToDiscord(entry) {
+    const webhookUrl = localStorage.getItem('discord_webhook');
+    if (!webhookUrl) return;
+    const preview = entry.content.length > 1500 ? entry.content.slice(0, 1500) + '...' : entry.content;
+    try {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          embeds: [{
+            title: `[${entry.album}] ${entry.title}`,
+            description: preview,
+            color: 3718648,
+            footer: { text: `Source: ${entry.sourceType}` }
+          }]
+        })
+      });
+    } catch (err) {
+      console.warn('Discord webhook failed:', err);
+    }
+  }
+
+  async function syncWithHuggingFace(silent = false) {
+    const repo = localStorage.getItem('hf_repo');
+    const token = localStorage.getItem('hf_token');
+    if (!repo || !token) {
+      if (!silent) alert('Enter your Hugging Face Dataset Repo and Write Token in Sync & Backup first.');
+      return;
+    }
+
+    try {
+      let remoteEntries = [];
+      const fetchUrl = `https://huggingface.co/datasets/${repo}/resolve/main/vault.json?t=${Date.now()}`;
+      const res = await fetch(fetchUrl, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        remoteEntries = await res.json();
+      }
+
+      const localEntries = await getAllEntries();
+      const map = new Map();
+
+      for (const item of remoteEntries) {
+        const clean = { ...item };
+        delete clean.id;
+        map.set(clean.createdAt + '|' + clean.title, clean);
+      }
+
+      let pulledCount = 0;
+      const localKeys = new Set(localEntries.map(e => e.createdAt + '|' + e.title));
+
+      for (const [key, item] of map.entries()) {
+        if (!localKeys.has(key)) {
+          await addLocalEntry(item);
+          pulledCount++;
+        }
+      }
+
+      for (const item of localEntries) {
+        const clean = { ...item };
+        delete clean.id;
+        map.set(clean.createdAt + '|' + clean.title, clean);
+      }
+
+      const merged = Array.from(map.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+      const commitUrl = `https://huggingface.co/api/datasets/${repo}/commit/main`;
+      const ndjsonBody = [
+        JSON.stringify({ key: 'header', value: { summary: 'Sync vault.json from Sovereign Vault PWA' } }),
+        JSON.stringify({ key: 'file', value: { content: JSON.stringify(merged, null, 2), path: 'vault.json', encoding: 'utf-8' } })
+      ].join('\n');
+
+      const pushRes = await fetch(commitUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/x-ndjson'
+        },
+        body: ndjsonBody
+      });
+
+      if (!pushRes.ok) throw new Error('Could not write to Hugging Face dataset—check that your token has Write permission.');
+      if (!silent) alert(`Sync complete! Pulled ${pulledCount} new items and backed up ${merged.length} total entries to Hugging Face.`);
+    } catch (err) {
+      if (!silent) alert(err.message);
+      console.warn('HF Sync note:', err);
+    }
+  }
+
+  async function handleImageBatch(event) {
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
+
+    const album = document.getElementById('album-tag').value.trim() || 'Uncategorized Screenshots';
+    const shouldDiscord = document.getElementById('publish-discord').checked;
+    const statusBox = document.getElementById('ocr-status');
+    statusBox.style.display = 'block';
+
+    const worker = await Tesseract.createWorker('eng');
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      statusBox.textContent = `Processing image ${i + 1} of ${files.length}: ${file.name}...`;
+      try {
+        const ret = await worker.recognize(file);
+        const extracted = ret.data.text.trim() || '[No readable text detected]';
+        const entry = {
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          album,
+          sourceType: 'Screenshot OCR',
+          content: extracted,
+          createdAt: new Date().toISOString()
+        };
+        await addLocalEntry(entry);
+        if (shouldDiscord) await postToDiscord(entry);
+      } catch (err) {
+        statusBox.textContent = `Error reading ${file.name}: ${err.message}`;
+      }
+    }
+
+    await worker.terminate();
+    await syncWithHuggingFace(true);
+    statusBox.textContent = `Done! Archived ${files.length} image(s) under "${album}" and synced.`;
+    event.target.value = '';
+  }
+
+  async function saveManualNote() {
+    const title = document.getElementById('manual-title').value.trim() || 'Quick Reflection';
+    const album = document.getElementById('album-tag').value.trim() || 'General Research';
+    const content = document.getElementById('manual-text').value.trim();
+    const shouldDiscord = document.getElementById('publish-discord').checked;
+    if (!content) return alert('Enter some text first.');
+
+    const entry = { title, album, sourceType: 'Note / Link', content, createdAt: new Date().toISOString() };
+    await addLocalEntry(entry);
+    if (shouldDiscord) await postToDiscord(entry);
+    await syncWithHuggingFace(true);
+
+    document.getElementById('manual-title').value = '';
+    document.getElementById('manual-text').value = '';
+    alert('Saved to Sovereign Vault!');
+  }
+
+  async function renderVault() {
+    if (!db) return;
+    const entries = await getAllEntries();
+    document.getElementById('vault-count').textContent = `${entries.length} ${entries.length === 1 ? 'Entry' : 'Entries'}`;
+
+    const filterEl = document.getElementById('album-filter');
+    const currentFilter = filterEl.value;
+    const albums = [...new Set(entries.map(e => e.album))].sort();
+    filterEl.innerHTML = '<option value="">All Albums / Topics</option>' +
+      albums.map(a => `<option value="${a}" ${a === currentFilter ? 'selected' : ''}>${a}</option>`).join('');
+
+    const query = document.getElementById('search-input').value.toLowerCase();
+    const filtered = entries.filter(e => {
+      const matchesAlbum = !currentFilter || e.album === currentFilter;
+      const matchesQuery = !query || e.title.toLowerCase().includes(query) || e.content.toLowerCase().includes(query) || e.album.toLowerCase().includes(query);
+      return matchesAlbum && matchesQuery;
+    });
+
+    const listEl = document.getElementById('vault-list');
+    if (!filtered.length) {
+      listEl.innerHTML = '<p style="text-align:center; color:var(--muted); padding: 24px;">No matching entries found.</p>';
+      return;
+    }
+
+    listEl.innerHTML = filtered.map(e => `
+      <div class="entry-card">
+        <div class="entry-header">
+          <div>
+            <span class="badge">${e.album}</span>
+            <h4 style="margin-top:6px; font-size:0.98rem;">${escapeHtml(e.title)}</h4>
+            <div class="entry-meta">${e.sourceType} • ${new Date(e.createdAt).toLocaleDateString()}</div>
+          </div>
+          <button class="btn btn-danger" onclick="deleteEntry(${e.id})">Delete</button>
+        </div>
+        <div class="entry-body">${escapeHtml(e.content)}</div>
+        <div class="row-actions">
+          <button class="btn btn-secondary" style="padding:7px; font-size:0.82rem;" onclick="copyText(${e.id})">Copy Markdown</button>
+          <button class="btn btn-secondary" style="padding:7px; font-size:0.82rem;" onclick="discordSingle(${e.id})">Post to Discord</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function copyText(id) {
+    const entries = await getAllEntries();
+    const item = entries.find(e => e.id === id);
+    if (item) {
+      await navigator.clipboard.writeText(`# ${item.title}\nAlbum: ${item.album}\n\n${item.content}`);
+      alert('Copied formatted Markdown.');
+    }
+  }
+
+  async function discordSingle(id) {
+    const entries = await getAllEntries();
+    const item = entries.find(e => e.id === id);
+    if (!item) return;
+    if (!localStorage.getItem('discord_webhook')) return alert('Add your Discord Webhook URL in Sync & Backup first.');
+    await postToDiscord(item);
+    alert('Posted to Discord channel!');
+  }
+
+  async function exportAllMarkdown() {
+    const entries = await getAllEntries();
+    if (!entries.length) return alert('Vault is empty.');
+    const md = entries.map(e => `# ${e.title}\n- **Album:** ${e.album}\n- **Source:** ${e.sourceType}\n- **Date:** ${e.createdAt}\n\n${e.content}\n\n---`).join('\n\n');
+    downloadFile('sovereign-vault-export.md', md, 'text/markdown');
+  }
+
+  async function exportAllJSON() {
+    const entries = await getAllEntries();
+    if (!entries.length) return alert('Vault is empty.');
+    downloadFile('sovereign-vault-backup.json', JSON.stringify(entries, null, 2), 'application/json');
+  }
+
+  function importJSONBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const items = JSON.parse(e.target.result);
+        for (const item of items) {
+          delete item.id;
+          await addLocalEntry(item);
+        }
+        await syncWithHuggingFace(true);
+        alert(`Imported ${items.length} entries successfully.`);
+      } catch (err) {
+        alert('Invalid JSON backup file.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function downloadFile(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+  }
+</script>
+</body>
+</html>
