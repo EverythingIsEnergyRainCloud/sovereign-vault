@@ -1,0 +1,18 @@
+{
+  "name": "Sovereign Vault — Research & OCR",
+  "short_name": "Sovereign Vault",
+  "description": "Offline-first research capture, batch screenshot OCR, and portable Markdown knowledge vault.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230f172a'/%3E%3Ccircle cx='256' cy='256' r='140' fill='none' stroke='%2338bdf8' stroke-width='28'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%2338bdf8'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
